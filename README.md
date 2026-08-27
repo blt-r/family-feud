@@ -2,6 +2,8 @@
 
 A real-time Family Feud-style game built for Cloudflare Workers. The audience board runs on a TV or projector, while the host controls questions, answers, teams, strikes, and scores from a phone.
 
+Play or host a game at [family-feud.www-edav.workers.dev](https://family-feud.www-edav.workers.dev).
+
 ## Features
 
 - Separate audience display and mobile host control panel
