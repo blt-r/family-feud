@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.agents/
+.codex/
+.dev.vars
+.env
+tmp/

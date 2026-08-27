@@ -1,0 +1,18 @@
+{
+  "name": "family-feud-live",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.30.2",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 0.0.0.0 --port 8787",
+    "deploy": "wrangler deploy",
+    "check": "node --check src/worker.js && node --check public/app.js && node scripts/validate-question-bank.mjs",
+    "test": "node --test",
+    "data:clean": "node scripts/clean-question-bank.mjs --write",
+    "data:check": "node scripts/validate-question-bank.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.33.1"
+  }
+}
