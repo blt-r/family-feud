@@ -1,6 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import worker, { GameRoom, RoomCreationLimiter, STARTER_QUESTIONS, normalizeQuestionKey, pickQuestionSet } from "../src/worker.js";
+import worker, { GameRoom, RoomCreationLimiter, normalizeQuestionKey, pickQuestionSet } from "../src/worker.js";
+
+const TEST_QUESTIONS = [
+  {
+    id: "test-one",
+    prompt: "Name a test answer.",
+    familyFriendly: true,
+    answers: [
+      { text: "First", points: 50 },
+      { text: "Second", points: 30 },
+      { text: "Third", points: 20 }
+    ]
+  },
+  {
+    id: "test-two",
+    prompt: "Name another test answer.",
+    familyFriendly: true,
+    answers: [
+      { text: "Alpha", points: 45 },
+      { text: "Beta", points: 35 },
+      { text: "Gamma", points: 20 }
+    ]
+  }
+];
 
 class MemoryStorage {
   constructor(values = {}) { this.values = new Map(Object.entries(values)); }
@@ -28,7 +51,18 @@ function context(values = {}) {
   };
 }
 
-const env = { ASSETS: { fetch: async () => Response.json(STARTER_QUESTIONS) } };
+const env = { ASSETS: { fetch: async () => Response.json(TEST_QUESTIONS) } };
+
+test("room creation fails clearly when the question library is unavailable", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const unavailableEnv = {
+    ASSETS: { fetch: async () => new Response("missing", { status: 404 }) },
+    GAME_ROOMS: { idFromName: () => { throw new Error("Room allocation should not run"); } }
+  };
+  const response = await worker.fetch(new Request("https://example.com/api/rooms", { method: "POST", body: "{}" }), unavailableEnv);
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "The question library is unavailable. Please try again." });
+});
 
 test("new rooms receive four-character codes", async () => {
   let initializedCode;
@@ -63,9 +97,9 @@ test("the clean host route serves the host page asset", async () => {
 });
 
 test("question selection removes normalized duplicates and respects family mode", () => {
-  const duplicate = { ...STARTER_QUESTIONS[0], id: "duplicate", prompt: `${STARTER_QUESTIONS[0].prompt.toUpperCase()}!` };
-  const blocked = { ...STARTER_QUESTIONS[1], id: "blocked", prompt: "A unique blocked prompt", familyFriendly: false };
-  const selected = pickQuestionSet([...STARTER_QUESTIONS, duplicate, blocked], true);
+  const duplicate = { ...TEST_QUESTIONS[0], id: "duplicate", prompt: `${TEST_QUESTIONS[0].prompt.toUpperCase()}!` };
+  const blocked = { ...TEST_QUESTIONS[1], id: "blocked", prompt: "A unique blocked prompt", familyFriendly: false };
+  const selected = pickQuestionSet([...TEST_QUESTIONS, duplicate, blocked], true);
   const keys = selected.map((question) => normalizeQuestionKey(question.prompt));
   assert.equal(new Set(keys).size, keys.length);
   assert.equal(selected.some((question) => question.id === "blocked"), false);
@@ -74,7 +108,7 @@ test("question selection removes normalized duplicates and respects family mode"
 test("malformed team counts cannot corrupt room state", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   assert.equal(await room.applyAction({ type: "team-count", count: "not-a-number" }), false);
   assert.equal(room.state.teams.length, 2);
 });
@@ -82,7 +116,7 @@ test("malformed team counts cannot corrupt room state", async () => {
 test("team defaults are consistent and removed team names are restored", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   assert.deepEqual(room.state.teams.map((team) => team.name), ["Team 1", "Team 2"]);
   assert.equal(await room.applyAction({ type: "team-count", count: 4 }), true);
   assert.deepEqual(room.state.teams.map((team) => team.name), ["Team 1", "Team 2", "Team 3", "Team 4"]);
@@ -95,7 +129,7 @@ test("team defaults are consistent and removed team names are restored", async (
 test("events use a monotonic sequence even inside one millisecond", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   await room.applyAction({ type: "sound", name: "intro" });
   const first = room.state.eventSequence;
   await room.applyAction({ type: "sound", name: "round-win" });
@@ -109,7 +143,7 @@ test("events use a monotonic sequence even inside one millisecond", async () => 
 test("the first hibernation-delivered host action waits for state loading", async () => {
   const savedRoom = new GameRoom(context(), env);
   await savedRoom.ready;
-  const state = savedRoom.initialState("ABCD");
+  const state = savedRoom.initialState("ABCD", TEST_QUESTIONS);
   const ctx = context({ state, hostToken: "a".repeat(32) });
   const room = new GameRoom(ctx, env);
   const messages = [];
@@ -127,7 +161,7 @@ test("the first hibernation-delivered host action waits for state loading", asyn
 test("public state hides unrevealed prompts and answers", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   const state = room.publicState(false);
   assert.equal(state.question.prompt, null);
   assert.equal(state.question.answers[0].text, null);
@@ -136,12 +170,12 @@ test("public state hides unrevealed prompts and answers", async () => {
 test("scoring applies the multiplier and awards the bank once", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   assert.equal(await room.applyAction({ type: "multiplier", value: 2 }), true);
   assert.equal(await room.applyAction({ type: "reveal", index: 0 }), true);
-  assert.equal(room.state.roundBank, STARTER_QUESTIONS[0].answers[0].points * 2);
+  assert.equal(room.state.roundBank, TEST_QUESTIONS[0].answers[0].points * 2);
   assert.equal(await room.applyAction({ type: "award", index: 1 }), true);
-  assert.equal(room.state.teams[1].score, STARTER_QUESTIONS[0].answers[0].points * 2);
+  assert.equal(room.state.teams[1].score, TEST_QUESTIONS[0].answers[0].points * 2);
   assert.equal(room.state.roundBank, 0);
   assert.equal(await room.applyAction({ type: "award", index: 1 }), false);
 });
@@ -149,7 +183,7 @@ test("scoring applies the multiplier and awards the bank once", async () => {
 test("existing rooms reject a colliding initialization", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   const response = await room.fetch(new Request("https://room.internal/init", { method: "POST", body: "{}" }));
   assert.equal(response.status, 409);
 });
@@ -157,7 +191,7 @@ test("existing rooms reject a colliding initialization", async () => {
 test("host claims create an HttpOnly cookie and unlock host state", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCD");
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
   room.hostToken = "a".repeat(32);
   const claim = await room.fetch(new Request("https://example.com/api/rooms/ABCD/claim", { method: "POST", headers: { authorization: `Bearer ${room.hostToken}` } }));
   const cookie = claim.headers.get("set-cookie");

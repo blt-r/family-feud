@@ -41,7 +41,7 @@ pnpm check
 pnpm test
 ```
 
-`pnpm check` validates the JavaScript and the canonical JSON question bank. The tests cover room-state actions, event sequencing, hibernation initialization, public-state privacy, question filtering, and data integrity.
+`pnpm check` validates the Svelte client and Worker JavaScript. The tests cover room-state actions, event sequencing, hibernation initialization, public-state privacy, question filtering, and question-bank integrity.
 
 ## Routes
 
@@ -51,4 +51,4 @@ pnpm test
 - `/api/rooms/:code/socket` — real-time room connection
 - `/api/rooms/:code/claim` — exchanges a private host-link token for a room-scoped HttpOnly cookie
 
-The Svelte client is built with Vite, while WebSockets and Cloudflare Durable Objects provide live synchronization and room state. `public/data/questions.json` is the canonical question source; new rooms receive five random questions from each answer-count group (3–7 answers). Run `pnpm data:clean` after importing new JSON and `pnpm data:check` before deployment.
+The Svelte client is built with Vite, while WebSockets and Cloudflare Durable Objects provide live synchronization and room state. `public/data/questions.json` is the canonical question source; new rooms receive five random questions from each answer-count group (3–7 answers).

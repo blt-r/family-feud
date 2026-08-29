@@ -9,74 +9,6 @@ const TEAM_COLORS = ["#36a4ff", "#ffbf3f", "#ff5c76", "#5de0a2"];
 const DEFAULT_TEAM_NAMES = ["Team 1", "Team 2", "Team 3", "Team 4"];
 let questionBankPromise;
 
-export const STARTER_QUESTIONS = [
-  {
-    id: "morning",
-    prompt: "Name something people do right after waking up.",
-    familyFriendly: true,
-    answers: [
-      { text: "Check their phone", points: 32 },
-      { text: "Use the bathroom", points: 26 },
-      { text: "Brush their teeth", points: 18 },
-      { text: "Make coffee", points: 12 },
-      { text: "Hit snooze", points: 7 },
-      { text: "Take a shower", points: 5 }
-    ]
-  },
-  {
-    id: "fridge",
-    prompt: "Name something you always keep in the fridge.",
-    familyFriendly: true,
-    answers: [
-      { text: "Milk", points: 31 },
-      { text: "Eggs", points: 24 },
-      { text: "Cheese", points: 18 },
-      { text: "Butter", points: 12 },
-      { text: "Leftovers", points: 9 },
-      { text: "Ketchup", points: 6 }
-    ]
-  },
-  {
-    id: "late",
-    prompt: "Name an excuse people give for being late.",
-    familyFriendly: true,
-    answers: [
-      { text: "Traffic", points: 38 },
-      { text: "Overslept", points: 24 },
-      { text: "Kids", points: 14 },
-      { text: "Car trouble", points: 10 },
-      { text: "Lost track of time", points: 8 },
-      { text: "Weather", points: 6 }
-    ]
-  },
-  {
-    id: "vacation",
-    prompt: "Name something people forget to pack for vacation.",
-    familyFriendly: true,
-    answers: [
-      { text: "Toothbrush", points: 29 },
-      { text: "Phone charger", points: 25 },
-      { text: "Swimsuit", points: 16 },
-      { text: "Sunscreen", points: 13 },
-      { text: "Underwear", points: 10 },
-      { text: "Medicine", points: 7 }
-    ]
-  },
-  {
-    id: "dog",
-    prompt: "Name something a dog gets excited about.",
-    familyFriendly: true,
-    answers: [
-      { text: "Food", points: 34 },
-      { text: "A walk", points: 28 },
-      { text: "Their owner", points: 15 },
-      { text: "A ball", points: 11 },
-      { text: "Other dogs", points: 7 },
-      { text: "The doorbell", points: 5 }
-    ]
-  }
-];
-
 function makeCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = crypto.getRandomValues(new Uint8Array(ROOM_CODE_LENGTH));
@@ -139,8 +71,7 @@ async function loadQuestionBank(env, requestURL) {
     return await questionBankPromise;
   } catch (error) {
     questionBankPromise = undefined;
-    console.error("Could not load JSON question bank; using starter questions for this request.", error);
-    return STARTER_QUESTIONS;
+    throw error;
   }
 }
 
@@ -197,7 +128,13 @@ export default {
       if (limited) return limited;
       const settings = await request.json().catch(() => ({}));
       const familyFriendly = settings.familyFriendly !== false;
-      const questionBank = await loadQuestionBank(env, request.url);
+      let questionBank;
+      try {
+        questionBank = await loadQuestionBank(env, request.url);
+      } catch (error) {
+        console.error("Could not load question bank", error);
+        return Response.json({ error: "The question library is unavailable. Please try again." }, { status: 503, headers: JSON_HEADERS });
+      }
       const questions = pickQuestionSet(questionBank, familyFriendly);
 
       for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -251,10 +188,10 @@ export class GameRoom {
     }
   }
 
-  initialState(code, questions = STARTER_QUESTIONS, familyFriendly = true) {
+  initialState(code, questions, familyFriendly = true) {
     return {
       code,
-      questions: Array.isArray(questions) && questions.length ? questions : STARTER_QUESTIONS,
+      questions,
       questionIndex: 0,
       questionVisible: false,
       revealed: [],
@@ -314,7 +251,7 @@ export class GameRoom {
     if (url.pathname === "/init" && request.method === "POST") {
       if (this.state) return new Response(null, { status: 409 });
       const { code, token, questions, familyFriendly } = await request.json();
-      if (!ROOM_CODE_PATTERN.test(code) || typeof token !== "string" || token.length < 24) {
+      if (!ROOM_CODE_PATTERN.test(code) || typeof token !== "string" || token.length < 24 || !Array.isArray(questions) || !questions.length) {
         return Response.json({ error: "Invalid room initialization" }, { status: 400, headers: JSON_HEADERS });
       }
       this.hostToken = token;

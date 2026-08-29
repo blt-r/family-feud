@@ -9,10 +9,8 @@
     "build": "vite build",
     "preview": "pnpm run build && vite preview --host 0.0.0.0 --port 8787",
     "deploy": "pnpm run build && wrangler deploy",
-    "check": "svelte-check --tsconfig ./jsconfig.json && node --check src/worker.js && node scripts/validate-question-bank.mjs",
-    "test": "node --test",
-    "data:clean": "node scripts/clean-question-bank.mjs --write",
-    "data:check": "node scripts/validate-question-bank.mjs"
+    "check": "svelte-check --tsconfig ./jsconfig.json && node --check src/worker.js",
+    "test": "node --test"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.1",
