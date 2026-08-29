@@ -1,9 +1,77 @@
 <script>
-  let { roomCode, game, connectionMessage, error, soundEnabled, strikeEvent, onEnableSounds } = $props();
+  import { onMount } from "svelte";
+  import { RoomConnection } from "./room.svelte.js";
+  import Toast from "./Toast.svelte";
+
+  const params = new URLSearchParams(location.search);
+  const initialRoomCode = (params.get("room") || "").toUpperCase();
+
+  let soundEnabled = $state(false);
+  let strikeEvent = $state.raw(null);
   let joinCode = $state("");
   let joinError = $state("");
+  let sounds = {};
+  let strikeTimer = null;
+
+  const room = new RoomConnection({
+    roomCode: initialRoomCode,
+    role: "display",
+    lobbyPath: "/",
+    eventMessage: (reason) => reason === "inactive" ? "The room expired after 24 hours without host activity." : "The host ended this room.",
+    onEvent: handleGameEvent
+  });
+
+  let roomCode = $derived(room.roomCode);
+  let game = $derived(room.game);
+  let connectionMessage = $derived(room.connectionMessage);
+  let error = $derived(room.error);
 
   let answerSlots = $derived(Array.from({ length: 8 }, (_, position) => ({ position, answer: game?.question.answers[position] })));
+
+  function stopSounds() {
+    Object.values(sounds).forEach((sound) => {
+      sound.pause();
+      sound.currentTime = 0;
+    });
+  }
+
+  function playSound(name) {
+    const sound = sounds[name];
+    if (!sound || !soundEnabled) return;
+    sound.currentTime = 0;
+    sound.play().catch(() => { soundEnabled = false; });
+  }
+
+  function handleGameEvent(event, nextGame) {
+    if (event.type === "strike") {
+      const count = Math.max(1, Math.min(3, Number(event.strikes) || Number(nextGame?.teams?.[event.team]?.strikes) || 1));
+      clearTimeout(strikeTimer);
+      strikeEvent = { sequence: event.sequence, count };
+      strikeTimer = setTimeout(() => { strikeEvent = null; }, 1000);
+      playSound("wrong");
+    }
+    if (event.type === "reveal") playSound("correct");
+    if (event.type === "sound") {
+      if (event.name === "stop") stopSounds();
+      else playSound(event.name);
+    }
+  }
+
+  async function enableSounds() {
+    try {
+      await Promise.all(Object.values(sounds).map(async (sound) => {
+        const volume = sound.volume;
+        sound.volume = 0;
+        await sound.play();
+        sound.pause();
+        sound.currentTime = 0;
+        sound.volume = volume;
+      }));
+      soundEnabled = true;
+    } catch {
+      room.showToast("Tap again to enable sound");
+    }
+  }
 
   function joinRoom(event) {
     event.preventDefault();
@@ -39,7 +107,28 @@
       };
     };
   }
+
+  onMount(() => {
+    sounds = {
+      correct: new Audio("/sfx/correct.mp3"),
+      wrong: new Audio("/sfx/wrong.mp3"),
+      intro: new Audio("/sfx/intro.mp3"),
+      "round-win": new Audio("/sfx/round-win.mp3")
+    };
+    Object.values(sounds).forEach((sound) => { sound.preload = "auto"; });
+    room.start();
+
+    return () => {
+      clearTimeout(strikeTimer);
+      stopSounds();
+      room.destroy();
+    };
+  });
 </script>
+
+<svelte:head>
+  <title>Family Feud — Game Board</title>
+</svelte:head>
 
 {#if !roomCode}
   <section class="lobby">
@@ -109,7 +198,7 @@
   </div>
 
   {#if !soundEnabled}
-    <button class="sound-gate" onclick={onEnableSounds}><span>♪</span> Tap to enable game sound</button>
+    <button class="sound-gate" onclick={enableSounds}><span>♪</span> Tap to enable game sound</button>
   {/if}
 
   {#if strikeEvent}
@@ -124,3 +213,5 @@
     {/key}
   {/if}
 {/if}
+
+<Toast toast={room.toast} />

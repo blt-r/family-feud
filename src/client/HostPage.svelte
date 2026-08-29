@@ -1,10 +1,61 @@
 <script>
-  let { roomCode, game, online, connectionMessage, error, send, showToast } = $props();
+  import { onMount } from "svelte";
+  import { RoomConnection } from "./room.svelte.js";
+  import Toast from "./Toast.svelte";
+
+  const params = new URLSearchParams(location.search);
+  const hashParams = new URLSearchParams(location.hash.slice(1));
+  const initialRoomCode = (params.get("room") || "").toUpperCase();
+  let hostToken = hashParams.get("token") || params.get("token") || (initialRoomCode ? localStorage.getItem(`feud-host-${initialRoomCode}`) : "") || "";
+
+  if (params.has("token") || hashParams.has("token")) {
+    const cleanURL = new URL(location.href);
+    cleanURL.searchParams.delete("token");
+    cleanURL.hash = "";
+    history.replaceState({}, "", `${cleanURL.pathname}${cleanURL.search}`);
+  }
+
+  const room = new RoomConnection({
+    roomCode: initialRoomCode,
+    role: "host",
+    lobbyPath: "/host",
+    beforeConnect: claimHostAccess,
+    clearAccess: (code) => localStorage.removeItem(`feud-host-${code}`),
+    eventMessage: (reason) => reason === "inactive" ? "The room expired after 24 hours without host activity." : "The room has ended and its data was deleted.",
+    onEvent: (event) => {
+      if (event.type === "award") room.showToast(`Awarded ${event.points} points`);
+    }
+  });
+
+  let roomCode = $derived(room.roomCode);
+  let game = $derived(room.game);
+  let online = $derived(room.online);
+  let connectionMessage = $derived(room.connectionMessage);
+  let error = $derived(room.error);
   let createFamilyFriendly = $state(true);
   let creating = $state(false);
   let createError = $state("");
 
   let displayURL = $derived(game ? `${location.origin}/?room=${encodeURIComponent(game.code)}` : "");
+
+  async function claimHostAccess() {
+    if (!hostToken) return;
+    const response = await fetch(`/api/rooms/${roomCode}/claim`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${hostToken}` }
+    });
+    if (!response.ok) throw Object.assign(new Error("This private host link is invalid or has expired."), { terminal: true });
+    localStorage.removeItem(`feud-host-${roomCode}`);
+    hostToken = "";
+  }
+
+  function send(type, data = {}) {
+    return room.send(type, data);
+  }
+
+  function showToast(message) {
+    room.showToast(message);
+  }
 
   async function createGame(event) {
     event.preventDefault();
@@ -108,7 +159,16 @@
     event.preventDefault();
     event.currentTarget.blur();
   }
+
+  onMount(() => {
+    room.start();
+    return () => room.destroy();
+  });
 </script>
+
+<svelte:head>
+  <title>Family Feud — Host</title>
+</svelte:head>
 
 {#if !roomCode}
   <section class="lobby">
@@ -270,3 +330,5 @@
     </div>
   </div>
 {/if}
+
+<Toast toast={room.toast} />

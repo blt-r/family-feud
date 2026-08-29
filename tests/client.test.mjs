@@ -5,18 +5,27 @@ import test from "node:test";
 const app = fs.readFileSync(new URL("../src/client/App.svelte", import.meta.url), "utf8");
 const host = fs.readFileSync(new URL("../src/client/HostPage.svelte", import.meta.url), "utf8");
 const display = fs.readFileSync(new URL("../src/client/DisplayPage.svelte", import.meta.url), "utf8");
+const room = fs.readFileSync(new URL("../src/client/room.svelte.js", import.meta.url), "utf8");
+const toast = fs.readFileSync(new URL("../src/client/Toast.svelte", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 test("host secrets are claimed from fragments rather than WebSocket query strings", () => {
-  assert.match(app, /hashParams\.get\("token"\)/);
-  assert.match(app, /\/claim/);
-  assert.doesNotMatch(app, /socket\?role=\$\{role\}.*token=/);
+  assert.match(host, /hashParams\.get\("token"\)/);
+  assert.match(host, /\/claim/);
+  assert.doesNotMatch(`${app}${host}${display}${room}`, /socket\?role=.*token=/);
 });
 
 test("the app uses a targeted live region", () => {
   assert.doesNotMatch(html, /<main[^>]+aria-live/);
-  assert.match(app, /role="status" aria-live="polite"/);
+  assert.match(toast, /role="status" aria-live="polite"/);
+});
+
+test("page components own page state and document titles", () => {
+  assert.doesNotMatch(app, /\$state|<svelte:head>/);
+  assert.match(host, /<svelte:head>[\s\S]*Family Feud — Host/);
+  assert.match(display, /<svelte:head>[\s\S]*Family Feud — Game Board/);
+  assert.match(room, /export class RoomConnection/);
 });
 
 test("narrow audience layouts retain two answer columns", () => {
