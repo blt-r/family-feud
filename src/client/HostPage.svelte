@@ -183,6 +183,7 @@
           <input type="checkbox" bind:checked={createFamilyFriendly} />
         </label>
         <button class="primary-button" disabled={creating}>{creating ? "Creating game…" : "Create a new game"}</button>
+        <a class="host-game-link" href="/">Join an existing game</a>
         {#if createError || error}<div class="form-error" role="alert">{createError || error}</div>{/if}
       </form>
     </div>

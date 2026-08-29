@@ -34,6 +34,7 @@ test("narrow audience layouts retain two answer columns", () => {
 
 test("host links use the clean route", () => {
   assert.match(display, /href="\/host"/);
+  assert.match(host, /href="\/">Join an existing game/);
   assert.match(host, /`\/host\?room=/);
   assert.doesNotMatch(`${app}${host}${display}`, /\/host\.html/);
 });
