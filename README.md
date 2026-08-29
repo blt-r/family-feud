@@ -1,4 +1,4 @@
-# Family Face-Off
+# Family Feud
 
 A real-time Family Feud-style game built for Cloudflare Workers. The audience board runs on a TV or projector, while the host controls questions, answers, teams, strikes, and scores from a phone.
 

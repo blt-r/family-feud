@@ -408,7 +408,7 @@ function renderHost() {
   app.innerHTML = `
     <div class="host-shell ${online ? "" : "is-offline"}">
       <header class="host-header">
-        <div class="host-brand">Family <span>Face-Off</span></div>
+        <div class="host-brand">Family <span>Feud</span></div>
         <div class="host-room"><span class="connection-dot ${online ? "" : "offline"}"></span> ROOM ${escapeHTML(game.code)}</div>
       </header>
       <main class="host-main">
@@ -524,7 +524,7 @@ function renderHost() {
   document.querySelector("#share-host").addEventListener("click", async () => {
     try {
       const hostURL = await privateHostURL();
-      if (navigator.share) await navigator.share({ title: "Family Face-Off host controls", url: hostURL });
+      if (navigator.share) await navigator.share({ title: "Family Feud host controls", url: hostURL });
       else {
         const copied = await copyText(hostURL);
         showToast(copied ? "Private host link copied" : "Could not copy link");
