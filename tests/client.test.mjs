@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 
-const app = fs.readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+const app = fs.readFileSync(new URL("../src/client/App.svelte", import.meta.url), "utf8");
+const host = fs.readFileSync(new URL("../src/client/HostPage.svelte", import.meta.url), "utf8");
+const display = fs.readFileSync(new URL("../src/client/DisplayPage.svelte", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
-const html = ["index.html", "host.html"].map((name) => fs.readFileSync(new URL(`../public/${name}`, import.meta.url), "utf8"));
+const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 test("host secrets are claimed from fragments rather than WebSocket query strings", () => {
   assert.match(app, /hashParams\.get\("token"\)/);
@@ -13,10 +15,8 @@ test("host secrets are claimed from fragments rather than WebSocket query string
 });
 
 test("the app uses a targeted live region", () => {
-  for (const page of html) {
-    assert.doesNotMatch(page, /<main[^>]+aria-live/);
-    assert.match(page, /id="status-region"[^>]+aria-live="polite"/);
-  }
+  assert.doesNotMatch(html, /<main[^>]+aria-live/);
+  assert.match(app, /role="status" aria-live="polite"/);
 });
 
 test("narrow audience layouts retain two answer columns", () => {
@@ -24,6 +24,13 @@ test("narrow audience layouts retain two answer columns", () => {
 });
 
 test("host links use the clean route", () => {
-  assert.match(app, /href="\/host"/);
-  assert.doesNotMatch(app, /\/host\.html/);
+  assert.match(display, /href="\/host"/);
+  assert.match(host, /`\/host\?room=/);
+  assert.doesNotMatch(`${app}${host}${display}`, /\/host\.html/);
+});
+
+test("team names submit on Enter as well as blur", () => {
+  assert.match(host, /onkeydown=\{submitTeamNameOnEnter\}/);
+  assert.match(host, /event\.key !== "Enter"/);
+  assert.match(host, /event\.currentTarget\.blur\(\)/);
 });

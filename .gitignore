@@ -1,7 +1,8 @@
 node_modules/
+dist/
 .wrangler/
 .agents/
 .codex/
-.dev.vars
+.dev.vars*
 .env
 tmp/

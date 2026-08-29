@@ -38,7 +38,7 @@ test("the clean host route serves the host page asset", async () => {
   } } };
   const response = await worker.fetch(new Request("https://example.com/host?room=ABCDEF"), routeEnv);
   assert.equal(response.status, 200);
-  assert.equal(assetURL.pathname, "/host.html");
+  assert.equal(assetURL.pathname, "/index.html");
   assert.equal(assetURL.search, "?room=ABCDEF");
 });
 

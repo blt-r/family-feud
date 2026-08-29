@@ -5,14 +5,21 @@
   "packageManager": "pnpm@11.24.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --ip 0.0.0.0 --port 8787",
-    "deploy": "wrangler deploy",
-    "check": "node --check src/worker.js && node --check public/app.js && node scripts/validate-question-bank.mjs",
+    "dev": "vite dev --host 0.0.0.0 --port 8787",
+    "build": "vite build",
+    "preview": "pnpm run build && vite preview --host 0.0.0.0 --port 8787",
+    "deploy": "pnpm run build && wrangler deploy",
+    "check": "svelte-check --tsconfig ./jsconfig.json && node --check src/worker.js && node scripts/validate-question-bank.mjs",
     "test": "node --test",
     "data:clean": "node scripts/clean-question-bank.mjs --write",
     "data:check": "node scripts/validate-question-bank.mjs"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.54.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "svelte": "^5.56.10",
+    "svelte-check": "^4.7.6",
+    "vite": "^8.2.2",
     "wrangler": "^4.33.1"
   }
 }

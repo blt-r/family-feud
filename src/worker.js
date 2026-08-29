@@ -220,7 +220,7 @@ export default {
       return env.GAME_ROOMS.get(id).fetch(request);
     }
     if (["GET", "HEAD"].includes(request.method) && ["/host", "/host/"].includes(url.pathname)) {
-      url.pathname = "/host.html";
+      url.pathname = "/index.html";
       return env.ASSETS.fetch(new Request(url, request));
     }
     return env.ASSETS.fetch(request);

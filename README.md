@@ -2,7 +2,7 @@
 
 [Play Family Feud](https://family-feud.www-edav.workers.dev) · [Host a game](https://family-feud.www-edav.workers.dev/host)
 
-A live Family Feud-style party game. Put the game board on a TV or projector and control the entire show from the host's phone.
+A live Family Feud-style party game built with Svelte and Cloudflare Workers. Put the game board on a TV or projector and control the entire show from the host's phone.
 
 ## What's included
 
@@ -51,4 +51,4 @@ pnpm test
 - `/api/rooms/:code/socket` — real-time room connection
 - `/api/rooms/:code/claim` — exchanges a private host-link token for a room-scoped HttpOnly cookie
 
-The app uses WebSockets for live synchronization and Cloudflare Durable Objects for room state. `public/data/questions.json` is the canonical question source; new rooms receive five random questions from each answer-count group (3–7 answers). Run `pnpm data:clean` after importing new JSON and `pnpm data:check` before deployment.
+The Svelte client is built with Vite, while WebSockets and Cloudflare Durable Objects provide live synchronization and room state. `public/data/questions.json` is the canonical question source; new rooms receive five random questions from each answer-count group (3–7 answers). Run `pnpm data:clean` after importing new JSON and `pnpm data:check` before deployment.
