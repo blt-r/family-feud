@@ -17,7 +17,7 @@ A live Family Feud-style party game built with Svelte and Cloudflare Workers. Pu
 ## How to play
 
 1. Open [the host controls](https://family-feud.www-edav.workers.dev/host) on a phone and create a room.
-2. Open the audience-display link on the TV or projector, or enter the six-character room code on the home page.
+2. Open the audience-display link on the TV or projector, or enter the four-character room code on the home page.
 3. Choose the current team, read the question aloud, then reveal the question on the display when you're ready.
 4. Tap answers to reveal them, add strikes for wrong guesses, and award the round bank to the winning team.
 

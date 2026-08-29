@@ -8,9 +8,9 @@
   function joinRoom(event) {
     event.preventDefault();
     const code = joinCode.trim().toUpperCase();
-    if (!/^[A-Z0-9]{5,6}$/.test(code)) {
+    if (!/^[A-Z0-9]{4}$/.test(code)) {
       joinCode = code;
-      joinError = "Use the five- or six-character room code.";
+      joinError = "Use the four-character room code.";
       return;
     }
     location.href = `/?room=${encodeURIComponent(code)}`;
@@ -49,7 +49,7 @@
       <h1>Ready for the face-off?</h1>
       <p class="muted">Enter the room code shown on the host's phone to put this screen in the game.</p>
       <form class="join-form" onsubmit={joinRoom}>
-        <input class="code-input" name="code" minlength="5" maxlength="6" placeholder="ABCDEF" aria-label="Five or six character room code" autocomplete="off" bind:value={joinCode} oninput={() => (joinError = "")} required />
+        <input class="code-input" name="code" minlength="4" maxlength="4" placeholder="FEUD" aria-label="Four-character room code" autocomplete="off" bind:value={joinCode} oninput={() => (joinError = "")} required />
         <button class="primary-button">Open game board</button>
         <a class="host-game-link" href="/host">Host a game</a>
         {#if joinError || error}<div class="form-error" role="alert">{joinError || error}</div>{/if}

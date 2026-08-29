@@ -30,16 +30,36 @@ function context(values = {}) {
 
 const env = { ASSETS: { fetch: async () => Response.json(STARTER_QUESTIONS) } };
 
+test("new rooms receive four-character codes", async () => {
+  let initializedCode;
+  const createEnv = {
+    ASSETS: env.ASSETS,
+    GAME_ROOMS: {
+      idFromName: (code) => code,
+      get: () => ({
+        fetch: async (_request, init) => {
+          initializedCode = JSON.parse(init.body).code;
+          return new Response(null, { status: 201 });
+        }
+      })
+    }
+  };
+  const response = await worker.fetch(new Request("https://example.com/api/rooms", { method: "POST", body: "{}" }), createEnv);
+  const result = await response.json();
+  assert.match(result.code, /^[A-Z0-9]{4}$/);
+  assert.equal(initializedCode, result.code);
+});
+
 test("the clean host route serves the host page asset", async () => {
   let assetURL;
   const routeEnv = { ASSETS: { fetch: async (request) => {
     assetURL = new URL(request.url);
     return new Response("host page");
   } } };
-  const response = await worker.fetch(new Request("https://example.com/host?room=ABCDEF"), routeEnv);
+  const response = await worker.fetch(new Request("https://example.com/host?room=ABCD"), routeEnv);
   assert.equal(response.status, 200);
   assert.equal(assetURL.pathname, "/index.html");
-  assert.equal(assetURL.search, "?room=ABCDEF");
+  assert.equal(assetURL.search, "?room=ABCD");
 });
 
 test("question selection removes normalized duplicates and respects family mode", () => {
@@ -54,7 +74,7 @@ test("question selection removes normalized duplicates and respects family mode"
 test("malformed team counts cannot corrupt room state", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   assert.equal(await room.applyAction({ type: "team-count", count: "not-a-number" }), false);
   assert.equal(room.state.teams.length, 2);
 });
@@ -62,7 +82,7 @@ test("malformed team counts cannot corrupt room state", async () => {
 test("team defaults are consistent and removed team names are restored", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   assert.deepEqual(room.state.teams.map((team) => team.name), ["Team 1", "Team 2"]);
   assert.equal(await room.applyAction({ type: "team-count", count: 4 }), true);
   assert.deepEqual(room.state.teams.map((team) => team.name), ["Team 1", "Team 2", "Team 3", "Team 4"]);
@@ -75,7 +95,7 @@ test("team defaults are consistent and removed team names are restored", async (
 test("events use a monotonic sequence even inside one millisecond", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   await room.applyAction({ type: "sound", name: "intro" });
   const first = room.state.eventSequence;
   await room.applyAction({ type: "sound", name: "round-win" });
@@ -89,7 +109,7 @@ test("events use a monotonic sequence even inside one millisecond", async () => 
 test("the first hibernation-delivered host action waits for state loading", async () => {
   const savedRoom = new GameRoom(context(), env);
   await savedRoom.ready;
-  const state = savedRoom.initialState("ABCDEF");
+  const state = savedRoom.initialState("ABCD");
   const ctx = context({ state, hostToken: "a".repeat(32) });
   const room = new GameRoom(ctx, env);
   const messages = [];
@@ -107,7 +127,7 @@ test("the first hibernation-delivered host action waits for state loading", asyn
 test("public state hides unrevealed prompts and answers", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   const state = room.publicState(false);
   assert.equal(state.question.prompt, null);
   assert.equal(state.question.answers[0].text, null);
@@ -116,7 +136,7 @@ test("public state hides unrevealed prompts and answers", async () => {
 test("scoring applies the multiplier and awards the bank once", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   assert.equal(await room.applyAction({ type: "multiplier", value: 2 }), true);
   assert.equal(await room.applyAction({ type: "reveal", index: 0 }), true);
   assert.equal(room.state.roundBank, STARTER_QUESTIONS[0].answers[0].points * 2);
@@ -129,7 +149,7 @@ test("scoring applies the multiplier and awards the bank once", async () => {
 test("existing rooms reject a colliding initialization", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   const response = await room.fetch(new Request("https://room.internal/init", { method: "POST", body: "{}" }));
   assert.equal(response.status, 409);
 });
@@ -137,14 +157,14 @@ test("existing rooms reject a colliding initialization", async () => {
 test("host claims create an HttpOnly cookie and unlock host state", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
-  room.state = room.initialState("ABCDEF");
+  room.state = room.initialState("ABCD");
   room.hostToken = "a".repeat(32);
-  const claim = await room.fetch(new Request("https://example.com/api/rooms/ABCDEF/claim", { method: "POST", headers: { authorization: `Bearer ${room.hostToken}` } }));
+  const claim = await room.fetch(new Request("https://example.com/api/rooms/ABCD/claim", { method: "POST", headers: { authorization: `Bearer ${room.hostToken}` } }));
   const cookie = claim.headers.get("set-cookie");
   assert.equal(claim.status, 204);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /Secure/);
-  const state = await room.fetch(new Request("https://example.com/api/rooms/ABCDEF/state?role=host", { headers: { cookie: cookie.split(";")[0] } }));
+  const state = await room.fetch(new Request("https://example.com/api/rooms/ABCD/state?role=host", { headers: { cookie: cookie.split(";")[0] } }));
   assert.equal(state.status, 200);
   assert.equal(Boolean((await state.json()).question.prompt), true);
 });

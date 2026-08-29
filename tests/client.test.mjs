@@ -34,3 +34,9 @@ test("team names submit on Enter as well as blur", () => {
   assert.match(host, /event\.key !== "Enter"/);
   assert.match(host, /event\.currentTarget\.blur\(\)/);
 });
+
+test("the audience display accepts exactly four-character room codes", () => {
+  assert.match(display, /\^\[A-Z0-9\]\{4\}\$/);
+  assert.match(display, /minlength="4" maxlength="4"/);
+  assert.match(display, /Four-character room code/);
+});

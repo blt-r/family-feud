@@ -3,8 +3,8 @@ const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const CREATION_WINDOW_MS = 10 * 60 * 1000;
 const CREATION_LIMIT = 20;
 const QUESTIONS_PER_ANSWER_COUNT = 5;
-const ROOM_CODE_LENGTH = 6;
-const ROOM_CODE_PATTERN = /^[A-Z0-9]{5,6}$/;
+const ROOM_CODE_LENGTH = 4;
+const ROOM_CODE_PATTERN = /^[A-Z0-9]{4}$/;
 const TEAM_COLORS = ["#36a4ff", "#ffbf3f", "#ff5c76", "#5de0a2"];
 const DEFAULT_TEAM_NAMES = ["Team 1", "Team 2", "Team 3", "Team 4"];
 let questionBankPromise;
@@ -214,7 +214,7 @@ export default {
       return Response.json({ error: "Could not allocate a unique room code" }, { status: 503, headers: JSON_HEADERS });
     }
 
-    const match = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]{5,6})\/(socket|state|claim|host-link)$/);
+    const match = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]{4})\/(socket|state|claim|host-link)$/);
     if (match && ROOM_CODE_PATTERN.test(match[1])) {
       const id = env.GAME_ROOMS.idFromName(match[1]);
       return env.GAME_ROOMS.get(id).fetch(request);
