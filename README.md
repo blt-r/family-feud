@@ -1,23 +1,27 @@
 # Family Feud
 
-A real-time Family Feud-style game built for Cloudflare Workers. The audience board runs on a TV or projector, while the host controls questions, answers, teams, strikes, and scores from a phone.
+[Play Family Feud](https://family-feud.www-edav.workers.dev) · [Host a game](https://family-feud.www-edav.workers.dev/host)
 
-Play or host a game at [family-feud.www-edav.workers.dev](https://family-feud.www-edav.workers.dev).
+A live Family Feud-style party game. Put the game board on a TV or projector and control the entire show from the host's phone.
 
-## Features
+## What's included
 
-- Separate audience display and mobile host control panel
-- Live synchronization over WebSockets
-- Persistent room state with Cloudflare Durable Objects
-- Automatic room deletion after 24 hours without host activity
+- A bundled library of thousands of questions, with 25 balanced questions loaded for each game
+- Family-friendly mode that filters questions with explicit prompts or answers
+- Iconic game-show sound effects for correct answers, strikes, the intro, and round wins
+- Separate audience display and phone-friendly host controls that stay synchronized live
 - Two to four named teams with scores and strikes
 - Answer reveals, round bank, and 1×/2×/3× scoring
-- Audience-display sound effects for correct answers, strikes, intro, and round wins
-- Twenty-five balanced random questions per room from the bundled JSON question bank
-- Family-friendly mode that excludes questions flagged for explicit prompts or answers
-- Manual question-bank refresh that preserves team names and total scores
-- Private host links and shareable display room codes
-- HttpOnly host authentication, collision-safe six-character room codes, and room-creation rate limiting
+- Fresh sets of 25 questions on demand without losing team names or scores
+
+## How to play
+
+1. Open [the host controls](https://family-feud.www-edav.workers.dev/host) on a phone and create a room.
+2. Open the audience-display link on the TV or projector, or enter the six-character room code on the home page.
+3. Choose the current team, read the question aloud, then reveal the question on the display when you're ready.
+4. Tap answers to reveal them, add strikes for wrong guesses, and award the round bank to the winning team.
+
+Rooms are private to the host link and automatically expire after 24 hours without host activity. The host can also end a room immediately.
 
 ## Run locally
 
@@ -26,9 +30,9 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:8787/host.html`, create a game, and use the audience link shown in the control panel.
+Open `http://localhost:8787/host`, create a game, and use the audience link shown in the control panel.
 
-Wrangler listens on all local network interfaces, so a phone on the same Wi-Fi can open `http://YOUR-COMPUTER-IP:8787/host.html`. Keep the terminal running while using the game.
+Wrangler listens on all local network interfaces, so a phone on the same Wi-Fi can open `http://YOUR-COMPUTER-IP:8787/host`. Keep the terminal running while using the game.
 
 ## Verify changes
 
@@ -42,9 +46,9 @@ pnpm test
 ## Routes
 
 - `/` — audience display (enter a room code)
-- `/host.html` — create and control a game
+- `/host` — create and control a game
 - `/api/rooms` — room creation
 - `/api/rooms/:code/socket` — real-time room connection
 - `/api/rooms/:code/claim` — exchanges a private host-link token for a room-scoped HttpOnly cookie
 
-Rooms refresh their 24-hour expiration whenever the host performs an action. The host can also permanently end a room immediately from the control panel. `public/data/questions.json` is the canonical question source; new rooms receive five random questions from each answer-count group (3–7 answers). Run `pnpm data:clean` after importing new JSON and `pnpm data:check` before deployment.
+The app uses WebSockets for live synchronization and Cloudflare Durable Objects for room state. `public/data/questions.json` is the canonical question source; new rooms receive five random questions from each answer-count group (3–7 answers). Run `pnpm data:clean` after importing new JSON and `pnpm data:check` before deployment.

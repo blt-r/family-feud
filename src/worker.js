@@ -6,6 +6,7 @@ const QUESTIONS_PER_ANSWER_COUNT = 5;
 const ROOM_CODE_LENGTH = 6;
 const ROOM_CODE_PATTERN = /^[A-Z0-9]{5,6}$/;
 const TEAM_COLORS = ["#36a4ff", "#ffbf3f", "#ff5c76", "#5de0a2"];
+const DEFAULT_TEAM_NAMES = ["Team 1", "Team 2", "Team 3", "Team 4"];
 let questionBankPromise;
 
 export const STARTER_QUESTIONS = [
@@ -218,6 +219,10 @@ export default {
       const id = env.GAME_ROOMS.idFromName(match[1]);
       return env.GAME_ROOMS.get(id).fetch(request);
     }
+    if (["GET", "HEAD"].includes(request.method) && ["/host", "/host/"].includes(url.pathname)) {
+      url.pathname = "/host.html";
+      return env.ASSETS.fetch(new Request(url, request));
+    }
     return env.ASSETS.fetch(request);
   }
 };
@@ -238,6 +243,11 @@ export class GameRoom {
     if (this.state) {
       this.state.eventSequence = Number.isSafeInteger(this.state.eventSequence) ? this.state.eventSequence : 0;
       this.state.questionVisible = this.state.questionVisible === true;
+      const savedNames = Array.isArray(this.state.teamNames) ? this.state.teamNames : [];
+      this.state.teamNames = DEFAULT_TEAM_NAMES.map((fallback, index) => {
+        const name = this.state.teams[index]?.name || savedNames[index];
+        return typeof name === "string" && name.trim() ? name.trim().slice(0, 24) : fallback;
+      });
     }
   }
 
@@ -252,9 +262,10 @@ export class GameRoom {
       roundBank: 0,
       multiplier: 1,
       familyFriendly,
+      teamNames: [...DEFAULT_TEAM_NAMES],
       teams: [
-        { name: "North Stars", score: 0, strikes: 0, color: TEAM_COLORS[0] },
-        { name: "Golden Crew", score: 0, strikes: 0, color: TEAM_COLORS[1] }
+        { name: DEFAULT_TEAM_NAMES[0], score: 0, strikes: 0, color: TEAM_COLORS[0] },
+        { name: DEFAULT_TEAM_NAMES[1], score: 0, strikes: 0, color: TEAM_COLORS[1] }
       ],
       eventSequence: 0,
       lastEvent: null
@@ -437,7 +448,7 @@ export class GameRoom {
         await this.replaceQuestionSet(this.state.familyFriendly !== false);
         return true;
       case "sound":
-        if (!["intro", "round-win"].includes(action.name)) return false;
+        if (!["intro", "round-win", "stop"].includes(action.name)) return false;
         this.recordEvent("sound", { name: action.name });
         return true;
       case "team-count": {
@@ -445,7 +456,7 @@ export class GameRoom {
         if (count === null || count === this.state.teams.length) return false;
         while (this.state.teams.length < count) {
           const index = this.state.teams.length;
-          this.state.teams.push({ name: `Team ${index + 1}`, score: 0, strikes: 0, color: TEAM_COLORS[index] });
+          this.state.teams.push({ name: this.state.teamNames[index], score: 0, strikes: 0, color: TEAM_COLORS[index] });
         }
         this.state.teams = this.state.teams.slice(0, count);
         if (this.state.activeTeam >= count) this.state.activeTeam = 0;
@@ -456,6 +467,7 @@ export class GameRoom {
         const name = typeof action.name === "string" ? action.name.trim().slice(0, 24) : "";
         if (index === null || !name || name === this.state.teams[index].name) return false;
         this.state.teams[index].name = name;
+        this.state.teamNames[index] = name;
         return true;
       }
       case "reset":

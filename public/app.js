@@ -78,7 +78,7 @@ function failConnection(message) {
   hostToken = "";
   clearTimeout(reconnectTimer);
   if (page === "host" && roomCode) localStorage.removeItem(`feud-host-${roomCode}`);
-  history.replaceState({}, "", page === "host" ? "/host.html" : "/");
+  history.replaceState({}, "", page === "host" ? "/host" : "/");
   roomCode = "";
   if (page === "host") hostLobby(message);
   else displayLobby(message);
@@ -152,7 +152,7 @@ function handleRoomEnded(reason) {
   if (page === "host" && roomCode) localStorage.removeItem(`feud-host-${roomCode}`);
   roomCode = "";
   hostToken = "";
-  history.replaceState({}, "", page === "host" ? "/host.html" : "/");
+  history.replaceState({}, "", page === "host" ? "/host" : "/");
   if (page === "host") hostLobby(reason === "inactive" ? "The room expired after 24 hours without host activity." : "The room has ended and its data was deleted.");
   else displayLobby(reason === "inactive" ? "This room expired after 24 hours without host activity." : "The host ended this room.");
 }
@@ -184,6 +184,13 @@ function playSound(name) {
   });
 }
 
+function stopSounds() {
+  Object.values(sounds).forEach((sound) => {
+    sound.pause();
+    sound.currentTime = 0;
+  });
+}
+
 function playEvent(event) {
   if (page === "display" && event.type === "strike") {
     const strikeCount = Math.max(1, Math.min(3, Number(event.strikes) || Number(game?.teams?.[event.team]?.strikes) || 1));
@@ -198,7 +205,10 @@ function playEvent(event) {
   if (page === "display" && event.type === "reveal") {
     playSound("correct");
   }
-  if (page === "display" && event.type === "sound") playSound(event.name);
+  if (page === "display" && event.type === "sound") {
+    if (event.name === "stop") stopSounds();
+    else playSound(event.name);
+  }
   if (page === "host" && event.type === "award") showToast(`Awarded ${event.points} points`);
 }
 
@@ -258,7 +268,7 @@ function displayLobby(error = "") {
         <form class="join-form" id="join-display">
           <input class="code-input" name="code" minlength="5" maxlength="6" placeholder="ABCDEF" aria-label="Five or six character room code" autocomplete="off" required />
           <button class="primary-button">Open game board</button>
-          <a class="host-game-link" href="/host.html">Host a game</a>
+          <a class="host-game-link" href="/host">Host a game</a>
           ${error ? `<div class="form-error" role="alert">${escapeHTML(error)}</div>` : ""}
         </form>
       </div>
@@ -359,7 +369,7 @@ function hostLobby(error = "") {
         throw new Error(result.error || "Could not create the game.");
       }
       const result = await response.json();
-      location.href = `/host.html?room=${encodeURIComponent(result.code)}#token=${encodeURIComponent(result.hostToken)}`;
+      location.href = `/host?room=${encodeURIComponent(result.code)}#token=${encodeURIComponent(result.hostToken)}`;
     } catch (error) {
       hostLobby(error.message);
     }
@@ -378,7 +388,7 @@ async function privateHostURL() {
   const response = await fetch(`/api/rooms/${roomCode}/host-link`, { cache: "no-store" });
   if (!response.ok) throw new Error("Could not create a private host link");
   const result = await response.json();
-  return `${location.origin}/host.html?room=${encodeURIComponent(roomCode)}#token=${encodeURIComponent(result.hostToken)}`;
+  return `${location.origin}/host?room=${encodeURIComponent(roomCode)}#token=${encodeURIComponent(result.hostToken)}`;
 }
 
 function renderHost() {
@@ -421,15 +431,16 @@ function renderHost() {
           </div>
         </section>
 
+        <section class="host-section show-sounds requires-connection">
+          <div class="section-heading"><h2>Show sounds</h2></div>
+          <div class="mini-actions"><button class="secondary-button" data-sound="intro">Play intro</button><button class="secondary-button" data-sound="round-win">Play round win</button><button class="secondary-button" data-sound="stop">Stop sounds</button></div>
+        </section>
+
         <section class="host-section gameplay requires-connection">
           <div class="section-heading"><h2>Who's playing?</h2><span class="bank-value">BANK ${game.roundBank}</span></div>
           <div class="team-picker">${teamButtons}</div>
           <div class="bank-action">
             <button class="award-button" id="award-bank" ${game.roundBank === 0 ? "disabled" : ""}>Award bank<strong>${game.roundBank} pts</strong></button>
-          </div>
-          <div class="show-sounds">
-            <span class="control-label">Show sounds</span>
-            <div class="mini-actions"><button class="secondary-button" data-sound="intro">Play intro</button><button class="secondary-button" data-sound="round-win">Play round win</button></div>
           </div>
         </section>
 
@@ -470,16 +481,16 @@ function renderHost() {
             <strong>${escapeHTML(game.code)}</strong>
           </div>
           <a class="display-link" href="${displayURL}" target="_blank" rel="noreferrer">Open audience display ↗</a>
-          <div class="mini-actions"><button class="secondary-button" id="copy-display">Copy display link</button><button class="secondary-button" id="share-host">Share host link</button></div>
+          <div class="mini-actions link-actions"><button class="secondary-button" id="copy-display">Copy board link</button><button class="secondary-button" id="copy-host">Copy host link</button></div>
         </section>
 
         <section class="host-section requires-connection">
           <div class="section-heading"><h2>Room controls</h2></div>
           <p class="host-note muted">Clear all scores, strikes, and revealed answers. Team names stay in place.</p>
-          <button class="danger-button" id="reset-game">Reset entire game</button>
+          <button class="danger-button room-control-button" id="reset-game">Reset entire game</button>
           <div class="end-room-control">
             <p class="host-note muted">Permanently close this room and disconnect the audience display. This cannot be undone.</p>
-            <button class="danger-button end-room-button" id="end-room">End room permanently</button>
+            <button class="danger-button room-control-button end-room-button" id="end-room">End room permanently</button>
           </div>
         </section>
       </main>
@@ -521,16 +532,13 @@ function renderHost() {
     const copied = await copyText(displayURL);
     showToast(copied ? "Display link copied" : "Could not copy link");
   });
-  document.querySelector("#share-host").addEventListener("click", async () => {
+  document.querySelector("#copy-host").addEventListener("click", async () => {
     try {
       const hostURL = await privateHostURL();
-      if (navigator.share) await navigator.share({ title: "Family Feud host controls", url: hostURL });
-      else {
-        const copied = await copyText(hostURL);
-        showToast(copied ? "Private host link copied" : "Could not copy link");
-      }
+      const copied = await copyText(hostURL);
+      showToast(copied ? "Private host link copied" : "Could not copy link");
     } catch (error) {
-      if (error.name !== "AbortError") showToast(error.message || "Could not share host link");
+      showToast(error.message || "Could not copy host link");
     }
   });
   document.querySelector("#reset-game").addEventListener("click", () => { if (confirm("Reset all scores and this round?")) send("reset"); });

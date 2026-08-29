@@ -22,3 +22,8 @@ test("the app uses a targeted live region", () => {
 test("narrow audience layouts retain two answer columns", () => {
   assert.match(css, /@media \(max-width: 680px\)[\s\S]*?\.answer-board \{ grid-template-columns: repeat\(2,/);
 });
+
+test("host links use the clean route", () => {
+  assert.match(app, /href="\/host"/);
+  assert.doesNotMatch(app, /\/host\.html/);
+});

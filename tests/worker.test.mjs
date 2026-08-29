@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GameRoom, RoomCreationLimiter, STARTER_QUESTIONS, normalizeQuestionKey, pickQuestionSet } from "../src/worker.js";
+import worker, { GameRoom, RoomCreationLimiter, STARTER_QUESTIONS, normalizeQuestionKey, pickQuestionSet } from "../src/worker.js";
 
 class MemoryStorage {
   constructor(values = {}) { this.values = new Map(Object.entries(values)); }
@@ -30,6 +30,18 @@ function context(values = {}) {
 
 const env = { ASSETS: { fetch: async () => Response.json(STARTER_QUESTIONS) } };
 
+test("the clean host route serves the host page asset", async () => {
+  let assetURL;
+  const routeEnv = { ASSETS: { fetch: async (request) => {
+    assetURL = new URL(request.url);
+    return new Response("host page");
+  } } };
+  const response = await worker.fetch(new Request("https://example.com/host?room=ABCDEF"), routeEnv);
+  assert.equal(response.status, 200);
+  assert.equal(assetURL.pathname, "/host.html");
+  assert.equal(assetURL.search, "?room=ABCDEF");
+});
+
 test("question selection removes normalized duplicates and respects family mode", () => {
   const duplicate = { ...STARTER_QUESTIONS[0], id: "duplicate", prompt: `${STARTER_QUESTIONS[0].prompt.toUpperCase()}!` };
   const blocked = { ...STARTER_QUESTIONS[1], id: "blocked", prompt: "A unique blocked prompt", familyFriendly: false };
@@ -47,6 +59,19 @@ test("malformed team counts cannot corrupt room state", async () => {
   assert.equal(room.state.teams.length, 2);
 });
 
+test("team defaults are consistent and removed team names are restored", async () => {
+  const room = new GameRoom(context(), env);
+  await room.ready;
+  room.state = room.initialState("ABCDEF");
+  assert.deepEqual(room.state.teams.map((team) => team.name), ["Team 1", "Team 2"]);
+  assert.equal(await room.applyAction({ type: "team-count", count: 4 }), true);
+  assert.deepEqual(room.state.teams.map((team) => team.name), ["Team 1", "Team 2", "Team 3", "Team 4"]);
+  assert.equal(await room.applyAction({ type: "rename-team", index: 3, name: "Cousins" }), true);
+  assert.equal(await room.applyAction({ type: "team-count", count: 2 }), true);
+  assert.equal(await room.applyAction({ type: "team-count", count: 4 }), true);
+  assert.equal(room.state.teams[3].name, "Cousins");
+});
+
 test("events use a monotonic sequence even inside one millisecond", async () => {
   const room = new GameRoom(context(), env);
   await room.ready;
@@ -56,6 +81,9 @@ test("events use a monotonic sequence even inside one millisecond", async () => 
   await room.applyAction({ type: "sound", name: "round-win" });
   assert.equal(room.state.eventSequence, first + 1);
   assert.equal(room.state.lastEvent.sequence, first + 1);
+  await room.applyAction({ type: "sound", name: "stop" });
+  assert.equal(room.state.eventSequence, first + 2);
+  assert.equal(room.state.lastEvent.name, "stop");
 });
 
 test("the first hibernation-delivered host action waits for state loading", async () => {
