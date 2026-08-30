@@ -238,13 +238,20 @@
         </div>
       </section>
 
-      <section class="host-section show-sounds">
-        <div class="section-heading"><h2>Show sounds</h2></div>
+      <section class="host-section display-sound-controls">
+        <div class="section-heading"><h2>Display &amp; sound</h2></div>
         <div class="mini-actions">
           <button type="button" class="secondary-button" disabled={!online} onclick={() => send("sound", { name: "intro" })}>Play intro</button>
           <button type="button" class="secondary-button" disabled={!online} onclick={() => send("sound", { name: "round-win" })}>Play round win</button>
           <button type="button" class="secondary-button" disabled={!online} onclick={() => send("sound", { name: "stop" })}>Stop sounds</button>
         </div>
+        <button
+          type="button"
+          class={["intermission-button", game.intermissionVisible && "is-visible"]}
+          aria-pressed={game.intermissionVisible}
+          disabled={!online}
+          onclick={() => send("intermission-visibility", { visible: !game.intermissionVisible })}
+        >{game.intermissionVisible ? "Return to game board" : "Show intermission screen"}</button>
       </section>
 
       <section class="host-section gameplay">

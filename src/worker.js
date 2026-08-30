@@ -180,6 +180,7 @@ export class GameRoom {
     if (this.state) {
       this.state.eventSequence = Number.isSafeInteger(this.state.eventSequence) ? this.state.eventSequence : 0;
       this.state.questionVisible = this.state.questionVisible === true;
+      this.state.intermissionVisible = this.state.intermissionVisible === true;
       const savedNames = Array.isArray(this.state.teamNames) ? this.state.teamNames : [];
       this.state.teamNames = DEFAULT_TEAM_NAMES.map((fallback, index) => {
         const name = this.state.teams[index]?.name || savedNames[index];
@@ -194,6 +195,7 @@ export class GameRoom {
       questions,
       questionIndex: 0,
       questionVisible: false,
+      intermissionVisible: true,
       revealed: [],
       activeTeam: 0,
       roundBank: 0,
@@ -220,6 +222,7 @@ export class GameRoom {
       questionIndex: this.state.questionIndex,
       questionCount: this.state.questions.length,
       questionVisible: this.state.questionVisible,
+      intermissionVisible: this.state.intermissionVisible === true,
       question: {
         prompt: forHost || this.state.questionVisible ? question.prompt : null,
         answers: question.answers.map((answer, index) => ({
@@ -372,6 +375,10 @@ export class GameRoom {
       case "question-visibility":
         if (typeof action.visible !== "boolean" || action.visible === this.state.questionVisible) return false;
         this.state.questionVisible = action.visible;
+        return true;
+      case "intermission-visibility":
+        if (typeof action.visible !== "boolean" || action.visible === this.state.intermissionVisible) return false;
+        this.state.intermissionVisible = action.visible;
         return true;
       case "multiplier":
         if (![1, 2, 3].includes(action.value) || action.value === this.state.multiplier) return false;

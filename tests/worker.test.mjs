@@ -140,6 +140,17 @@ test("events use a monotonic sequence even inside one millisecond", async () => 
   assert.equal(room.state.lastEvent.name, "stop");
 });
 
+test("the host can toggle the intermission display", async () => {
+  const room = new GameRoom(context(), env);
+  await room.ready;
+  room.state = room.initialState("ABCD", TEST_QUESTIONS);
+  assert.equal(room.publicState(false).intermissionVisible, true);
+  assert.equal(await room.applyAction({ type: "intermission-visibility", visible: false }), true);
+  assert.equal(room.publicState(false).intermissionVisible, false);
+  assert.equal(await room.applyAction({ type: "intermission-visibility", visible: false }), false);
+  assert.equal(await room.applyAction({ type: "intermission-visibility", visible: true }), true);
+});
+
 test("the first hibernation-delivered host action waits for state loading", async () => {
   const savedRoom = new GameRoom(context(), env);
   await savedRoom.ready;

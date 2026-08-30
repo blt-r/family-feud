@@ -10,6 +10,7 @@ A live Family Feud-style party game built with Svelte and Cloudflare Workers. Pu
 - Family-friendly mode that filters questions with explicit prompts or answers
 - Iconic game-show sound effects for correct answers, strikes, the intro, and round wins
 - Separate audience display and phone-friendly host controls that stay synchronized live
+- A host-controlled intermission screen for breaks before and between rounds
 - Two to four named teams with scores and strikes
 - Answer reveals, round bank, and 1×/2×/3× scoring
 - Fresh sets of 25 questions on demand without losing team names or scores

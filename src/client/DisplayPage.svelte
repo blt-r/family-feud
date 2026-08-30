@@ -155,53 +155,64 @@
     </div>
   </section>
 {:else}
-  <div class="game-stage">
-    <section class="stage-content">
-      <div class="question-slot">
-        <div class="question-banner" aria-hidden={!game.questionVisible} {@attach fitQuestion(game.questionVisible ? game.question.prompt : "")}>{game.questionVisible ? game.question.prompt : ""}</div>
-      </div>
-      <div class="bank-board"><strong>{game.roundBank}</strong></div>
-      <div class="answer-board" style:--answer-rows={4}>
-        {#each answerSlots as slot (slot.position)}
-          {#if slot.answer}
-            {@const answer = slot.answer}
-            {@const textParts = String(answer.text || "").split("/").map((text, position) => ({ text, position }))}
-            <div class={["answer-tile", answer.revealed && "is-revealed"]}>
-              <div class="answer-face answer-hidden"><span class="answer-number">{slot.position + 1}</span><span></span><span></span></div>
-              <div class="answer-face answer-revealed">
-                <span></span>
-                <span class="answer-text">
-                  {#each textParts as part (part.position)}
-                    {part.text}{#if part.position < textParts.length - 1}<span class="answer-separator">/</span>{/if}
-                  {/each}
-                </span>
-                <span class="answer-points">{answer.points ?? ""}</span>
-              </div>
-            </div>
-          {:else}
-            <div class="answer-tile answer-placeholder" aria-hidden="true"></div>
-          {/if}
-        {/each}
-      </div>
-    </section>
-    <footer class="teams-strip" style:--team-count={game.teams.length}>
-      {#each game.teams as team, index (team.color)}
-        <div class={["team-score", game.activeTeam === index && "active"]} style:--team-color={team.color}>
-          <div>
-            <div class="team-name">{team.name}</div>
-            <div class="team-status" aria-label={`${team.strikes} strikes`}>{"X".repeat(team.strikes)}</div>
-          </div>
-          <div class="score-number">{team.score}</div>
+  {#if game.intermissionVisible}
+    <main class="intermission-stage">
+      <div class="intermission-rays" aria-hidden="true"></div>
+      <div class="intermission-sparkles" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <h1 class="intermission-logo" aria-label="Family Feud">
+        <span class="logo-family">Family</span>
+        <span class="logo-feud">Feud</span>
+      </h1>
+    </main>
+  {:else}
+    <div class="game-stage">
+      <section class="stage-content">
+        <div class="question-slot">
+          <div class="question-banner" aria-hidden={!game.questionVisible} {@attach fitQuestion(game.questionVisible ? game.question.prompt : "")}>{game.questionVisible ? game.question.prompt : ""}</div>
         </div>
-      {/each}
-    </footer>
-  </div>
+        <div class="bank-board"><strong>{game.roundBank}</strong></div>
+        <div class="answer-board" style:--answer-rows={4}>
+          {#each answerSlots as slot (slot.position)}
+            {#if slot.answer}
+              {@const answer = slot.answer}
+              {@const textParts = String(answer.text || "").split("/").map((text, position) => ({ text, position }))}
+              <div class={["answer-tile", answer.revealed && "is-revealed"]}>
+                <div class="answer-face answer-hidden"><span class="answer-number">{slot.position + 1}</span><span></span><span></span></div>
+                <div class="answer-face answer-revealed">
+                  <span></span>
+                  <span class="answer-text">
+                    {#each textParts as part (part.position)}
+                      {part.text}{#if part.position < textParts.length - 1}<span class="answer-separator">/</span>{/if}
+                    {/each}
+                  </span>
+                  <span class="answer-points">{answer.points ?? ""}</span>
+                </div>
+              </div>
+            {:else}
+              <div class="answer-tile answer-placeholder" aria-hidden="true"></div>
+            {/if}
+          {/each}
+        </div>
+      </section>
+      <footer class="teams-strip" style:--team-count={game.teams.length}>
+        {#each game.teams as team, index (team.color)}
+          <div class={["team-score", game.activeTeam === index && "active"]} style:--team-color={team.color}>
+            <div>
+              <div class="team-name">{team.name}</div>
+              <div class="team-status" aria-label={`${team.strikes} strikes`}>{"X".repeat(team.strikes)}</div>
+            </div>
+            <div class="score-number">{team.score}</div>
+          </div>
+        {/each}
+      </footer>
+    </div>
+  {/if}
 
   {#if !soundEnabled}
     <button class="sound-gate" onclick={enableSounds}><span>♪</span> Tap to enable game sound</button>
   {/if}
 
-  {#if strikeEvent}
+  {#if strikeEvent && !game.intermissionVisible}
     {#key strikeEvent.sequence}
       <div class="strike-overlay" aria-hidden="true">
         <div class="strike-x-group" data-count={strikeEvent.count} style:--strike-count={strikeEvent.count}>
