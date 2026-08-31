@@ -417,8 +417,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .team-button-meta { display: block; margin-top: 0.3rem; color: var(--muted); font: 0.67rem/1 var(--mono); }
 .bank-action { margin-top: 0.8rem; }
 .bank-action .award-button { width: 100%; }
-.answer-verdict-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 0.65rem; margin-top: 0.8rem; }
-.answer-verdict-actions .secondary-button { min-height: 5rem; }
+.strike-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 0.65rem; margin-top: 0.8rem; }
+.strike-actions .secondary-button { min-height: 5rem; }
 .strike-button { min-height: 5rem; border: 1px solid rgba(255, 73, 106, 0.45); border-radius: 0.8rem; background: rgba(255, 73, 106, 0.12); color: #ff7891; cursor: pointer; font: 1.5rem/1 var(--display); }
 .award-button { min-height: 5rem; border: 0; border-radius: 0.8rem; background: var(--gold); color: #181406; cursor: pointer; font-weight: 700; }
 .award-button strong { display: block; margin-top: 0.25rem; font: 1.1rem/1 var(--mono); }

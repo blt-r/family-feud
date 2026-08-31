@@ -251,7 +251,7 @@
           aria-pressed={game.intermissionVisible}
           disabled={!online}
           onclick={() => send("intermission-visibility", { visible: !game.intermissionVisible })}
-        >{game.intermissionVisible ? "Return to game board" : "Show intermission screen"}</button>
+        >{game.intermissionVisible ? "Show game board" : "Show intermission screen"}</button>
       </section>
 
       <section class="host-section gameplay">
@@ -266,6 +266,10 @@
         </div>
         <div class="bank-action">
           <button type="button" class="award-button" disabled={!online || game.roundBank === 0} onclick={() => send("award")}>Award bank<strong>{game.roundBank} pts</strong></button>
+        </div>
+        <div class="strike-actions">
+          <button type="button" class="strike-button" disabled={!online} onclick={() => send("strike")}>Add X</button>
+          <button type="button" class="secondary-button" disabled={!online} onclick={() => send("undo-strike")}>Undo X</button>
         </div>
       </section>
 
@@ -296,10 +300,6 @@
               <span class="points">{answer.points}</span>
             </button>
           {/each}
-        </div>
-        <div class="answer-verdict-actions">
-          <button type="button" class="strike-button" disabled={!online} onclick={() => send("strike")}>Add X</button>
-          <button type="button" class="secondary-button" disabled={!online} onclick={() => send("undo-strike")}>Undo X</button>
         </div>
       </section>
 

@@ -180,7 +180,6 @@ export class GameRoom {
     if (this.state) {
       this.state.eventSequence = Number.isSafeInteger(this.state.eventSequence) ? this.state.eventSequence : 0;
       this.state.questionVisible = this.state.questionVisible === true;
-      this.state.intermissionVisible = this.state.intermissionVisible === true;
       const savedNames = Array.isArray(this.state.teamNames) ? this.state.teamNames : [];
       this.state.teamNames = DEFAULT_TEAM_NAMES.map((fallback, index) => {
         const name = this.state.teams[index]?.name || savedNames[index];
