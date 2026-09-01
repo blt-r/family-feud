@@ -45,6 +45,21 @@ test("team names submit on Enter as well as blur", () => {
   assert.match(host, /event\.currentTarget\.blur\(\)/);
 });
 
+test("host answer controls separate scoring reveals from reveal-only answers", () => {
+  assert.match(host, /send\("reveal-only"/);
+  assert.match(host, />\+ Bank<\/button>/);
+  assert.match(host, />Reveal only<\/button>/);
+  assert.doesNotMatch(host, /Tap again to undo/);
+});
+
+test("question navigation is immediate while question reloads stay confirmed", () => {
+  assert.match(host, /function changeQuestion[\s\S]*?send\("question", \{ index \}\);/);
+  assert.doesNotMatch(host, /Changing questions/);
+  assert.match(host, /function confirmQuestionReload[\s\S]*?confirm\(/);
+  assert.match(host, /confirmQuestionReload\(\)\) send\("refresh-questions"\)/);
+  assert.doesNotMatch(host, /Reset all scores and this round/);
+});
+
 test("the audience display accepts exactly four-character room codes", () => {
   assert.match(display, /\^\[A-Z0-9\]\{4\}\$/);
   assert.match(display, /minlength="4" maxlength="4"/);

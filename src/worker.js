@@ -5,6 +5,7 @@ const CREATION_LIMIT = 20;
 const QUESTIONS_PER_ANSWER_COUNT = 5;
 const ROOM_CODE_LENGTH = 4;
 const ROOM_CODE_PATTERN = /^[A-Z0-9]{4}$/;
+const STATE_SCHEMA_VERSION = 3;
 const TEAM_COLORS = ["#36a4ff", "#ffbf3f", "#ff5c76", "#5de0a2"];
 const DEFAULT_TEAM_NAMES = ["Team 1", "Team 2", "Team 3", "Team 4"];
 let questionBankPromise;
@@ -178,8 +179,12 @@ export class GameRoom {
     this.state = saved.get("state") || null;
     this.hostToken = saved.get("hostToken") || null;
     if (this.state) {
+      if (this.state.schemaVersion !== STATE_SCHEMA_VERSION || !Array.isArray(this.state.allocations)) {
+        this.state = this.initialState(this.state.code, this.state.questions, this.state.familyFriendly !== false);
+        await this.ctx.storage.put("state", this.state);
+        return;
+      }
       this.state.eventSequence = Number.isSafeInteger(this.state.eventSequence) ? this.state.eventSequence : 0;
-      this.state.questionVisible = this.state.questionVisible === true;
       const savedNames = Array.isArray(this.state.teamNames) ? this.state.teamNames : [];
       this.state.teamNames = DEFAULT_TEAM_NAMES.map((fallback, index) => {
         const name = this.state.teams[index]?.name || savedNames[index];
@@ -189,25 +194,37 @@ export class GameRoom {
   }
 
   initialState(code, questions, familyFriendly = true) {
+    const rounds = {};
+    const questionRoundIds = questions.map((_question, index) => {
+      const roundId = index + 1;
+      rounds[roundId] = this.initialRoundState();
+      return roundId;
+    });
     return {
+      schemaVersion: STATE_SCHEMA_VERSION,
       code,
       questions,
+      questionRoundIds,
+      archivedQuestionSets: [],
+      rounds,
       questionIndex: 0,
-      questionVisible: false,
       intermissionVisible: true,
-      revealed: [],
-      activeTeam: 0,
-      roundBank: 0,
-      multiplier: 1,
+      allocations: [],
+      nextRoundId: questions.length + 1,
+      nextAwardId: 1,
       familyFriendly,
       teamNames: [...DEFAULT_TEAM_NAMES],
       teams: [
-        { name: DEFAULT_TEAM_NAMES[0], score: 0, strikes: 0, color: TEAM_COLORS[0] },
-        { name: DEFAULT_TEAM_NAMES[1], score: 0, strikes: 0, color: TEAM_COLORS[1] }
+        { name: DEFAULT_TEAM_NAMES[0], color: TEAM_COLORS[0] },
+        { name: DEFAULT_TEAM_NAMES[1], color: TEAM_COLORS[1] }
       ],
       eventSequence: 0,
       lastEvent: null
     };
+  }
+
+  initialRoundState() {
+    return { multiplier: 1, questionVisible: false, activeTeam: 0, strikes: [0, 0, 0, 0], lastAwardId: null };
   }
 
   isHostRequest(request) {
@@ -216,29 +233,67 @@ export class GameRoom {
 
   publicState(forHost = false) {
     const question = this.state.questions[this.state.questionIndex];
+    const round = this.currentRound();
+    const currentAllocations = this.currentAllocations();
+    const allocationsByAnswer = new Map(currentAllocations.map((allocation) => [allocation.answerIndex, allocation]));
     return {
       code: this.state.code,
       questionIndex: this.state.questionIndex,
       questionCount: this.state.questions.length,
-      questionVisible: this.state.questionVisible,
+      questionVisible: round.questionVisible,
       intermissionVisible: this.state.intermissionVisible === true,
       question: {
-        prompt: forHost || this.state.questionVisible ? question.prompt : null,
-        answers: question.answers.map((answer, index) => ({
-          text: this.state.revealed.includes(index) || forHost ? answer.text : null,
-          points: this.state.revealed.includes(index) || forHost ? answer.points : null,
-          revealed: this.state.revealed.includes(index)
-        }))
+        prompt: forHost || round.questionVisible ? question.prompt : null,
+        answers: question.answers.map((answer, index) => {
+          const allocation = allocationsByAnswer.get(index);
+          return {
+            text: allocation || forHost ? answer.text : null,
+            points: allocation || forHost ? answer.points : null,
+            revealed: Boolean(allocation),
+            owner: forHost ? allocation?.owner || null : undefined
+          };
+        })
       },
       questionTitles: forHost ? this.state.questions.map((item) => item.prompt) : undefined,
-      activeTeam: this.state.activeTeam,
-      roundBank: this.state.roundBank,
-      multiplier: this.state.multiplier,
+      activeTeam: round.activeTeam,
+      roundBank: this.allocationTotal(currentAllocations.filter((allocation) => allocation.owner.type === "bank")),
+      multiplier: round.multiplier,
       familyFriendly: this.state.familyFriendly !== false,
-      teams: this.state.teams,
+      teams: this.state.teams.map((team, index) => ({ ...team, score: this.teamScore(index), strikes: round.strikes[index] || 0 })),
+      lastAward: forHost ? this.lastAward() : undefined,
       eventSequence: this.state.eventSequence,
       lastEvent: this.state.lastEvent
     };
+  }
+
+  currentRoundId() {
+    return this.state.questionRoundIds[this.state.questionIndex];
+  }
+
+  currentRound() {
+    return this.state.rounds[this.currentRoundId()];
+  }
+
+  currentAllocations() {
+    const roundId = this.currentRoundId();
+    return this.state.allocations.filter((allocation) => allocation.roundId === roundId);
+  }
+
+  allocationTotal(allocations) {
+    return allocations.reduce((total, allocation) => total + allocation.basePoints * allocation.multiplier, 0);
+  }
+
+  teamScore(team) {
+    return this.allocationTotal(this.state.allocations.filter((allocation) => allocation.owner.type === "team" && allocation.owner.teamIndex === team));
+  }
+
+  lastAward() {
+    const awardId = this.currentRound().lastAwardId;
+    if (!Number.isInteger(awardId)) return null;
+    const allocations = this.state.allocations.filter((allocation) => allocation.awardId === awardId);
+    const owner = allocations[0]?.owner;
+    if (owner?.type !== "team" || !Number.isInteger(owner.teamIndex)) return null;
+    return { team: owner.teamIndex, points: this.allocationTotal(allocations) };
   }
 
   recordEvent(type, details = {}) {
@@ -324,64 +379,107 @@ export class GameRoom {
   async applyAction(action) {
     if (!action || typeof action !== "object" || typeof action.type !== "string") return false;
     const current = this.state.questions[this.state.questionIndex];
+    const round = this.currentRound();
     const integer = (value, minimum, maximum) => Number.isInteger(value) && value >= minimum && value <= maximum ? value : null;
     switch (action.type) {
-      case "reveal": {
+      case "reveal":
+      case "reveal-only": {
         const index = integer(action.index, 0, current.answers.length - 1);
-        if (index === null || this.state.revealed.includes(index)) return false;
-        this.state.revealed.push(index);
-        this.state.roundBank += current.answers[index].points * this.state.multiplier;
-        this.recordEvent("reveal", { index });
+        if (index === null || this.currentAllocations().some((allocation) => allocation.answerIndex === index)) return false;
+        const answer = current.answers[index];
+        this.state.allocations.push({
+          roundId: this.currentRoundId(),
+          questionId: current.id || normalizeQuestionKey(current.prompt),
+          question: current.prompt,
+          answerIndex: index,
+          answer: answer.text,
+          basePoints: answer.points,
+          multiplier: round.multiplier,
+          owner: { type: action.type === "reveal" ? "bank" : "unscored" },
+          awardId: null
+        });
+        this.recordEvent("reveal", { index, scored: action.type === "reveal" });
+        return true;
+      }
+      case "hide-answer": {
+        const index = integer(action.index, 0, current.answers.length - 1);
+        const allocation = index === null ? null : this.currentAllocations().find((entry) => entry.answerIndex === index);
+        if (!allocation) return false;
+        this.state.allocations = this.state.allocations.filter((entry) => entry !== allocation);
+        if (allocation.awardId === round.lastAwardId && !this.state.allocations.some((entry) => entry.awardId === round.lastAwardId)) {
+          round.lastAwardId = null;
+        }
+        this.recordEvent("hide-answer", { index });
         return true;
       }
       case "strike": {
-        const team = this.state.teams[this.state.activeTeam];
-        if (!team || team.strikes >= 3) return false;
-        team.strikes += 1;
-        this.recordEvent("strike", { team: this.state.activeTeam, strikes: team.strikes });
+        const team = this.state.teams[round.activeTeam];
+        const strikes = round.strikes[round.activeTeam] || 0;
+        if (!team || strikes >= 3) return false;
+        round.strikes[round.activeTeam] = strikes + 1;
+        this.recordEvent("strike", { team: round.activeTeam, strikes: strikes + 1 });
         return true;
       }
       case "undo-strike": {
-        const team = this.state.teams[this.state.activeTeam];
-        if (!team || team.strikes <= 0) return false;
-        team.strikes -= 1;
+        const team = this.state.teams[round.activeTeam];
+        const strikes = round.strikes[round.activeTeam] || 0;
+        if (!team || strikes <= 0) return false;
+        round.strikes[round.activeTeam] = strikes - 1;
         return true;
       }
       case "active-team": {
         const index = integer(action.index, 0, this.state.teams.length - 1);
         if (index === null) return false;
-        this.state.activeTeam = index;
+        round.activeTeam = index;
         return true;
       }
       case "award": {
-        const requested = action.index === undefined ? this.state.activeTeam : action.index;
+        const requested = action.index === undefined ? round.activeTeam : action.index;
         const index = integer(requested, 0, this.state.teams.length - 1);
-        if (index === null || this.state.roundBank <= 0) return false;
-        const points = this.state.roundBank;
-        this.state.teams[index].score += points;
-        this.state.roundBank = 0;
+        const allocations = this.currentAllocations().filter((allocation) => allocation.owner.type === "bank");
+        if (index === null || !allocations.length) return false;
+        const points = this.allocationTotal(allocations);
+        const awardId = this.state.nextAwardId;
+        this.state.nextAwardId += 1;
+        allocations.forEach((allocation) => {
+          allocation.owner = { type: "team", teamIndex: index };
+          allocation.awardId = awardId;
+        });
+        round.lastAwardId = awardId;
         this.recordEvent("award", { team: index, points });
+        return true;
+      }
+      case "undo-award": {
+        const award = this.lastAward();
+        if (!award) return false;
+        this.state.allocations.forEach((allocation) => {
+          if (allocation.awardId !== round.lastAwardId) return;
+          allocation.owner = { type: "bank" };
+          allocation.awardId = null;
+        });
+        round.lastAwardId = null;
+        this.recordEvent("undo-award", { team: award.team, points: award.points });
         return true;
       }
       case "question": {
         const index = integer(action.index, 0, this.state.questions.length - 1);
         if (index === null || index === this.state.questionIndex) return false;
         this.state.questionIndex = index;
-        this.clearRound();
         this.recordEvent("question");
         return true;
       }
       case "question-visibility":
-        if (typeof action.visible !== "boolean" || action.visible === this.state.questionVisible) return false;
-        this.state.questionVisible = action.visible;
+        if (typeof action.visible !== "boolean" || action.visible === round.questionVisible) return false;
+        round.questionVisible = action.visible;
         return true;
       case "intermission-visibility":
         if (typeof action.visible !== "boolean" || action.visible === this.state.intermissionVisible) return false;
         this.state.intermissionVisible = action.visible;
         return true;
       case "multiplier":
-        if (![1, 2, 3].includes(action.value) || action.value === this.state.multiplier) return false;
-        this.state.multiplier = action.value;
+        if (![1, 2, 3].includes(action.value) || action.value === round.multiplier) return false;
+        round.multiplier = action.value;
+        this.currentAllocations().forEach((allocation) => { allocation.multiplier = action.value; });
         return true;
       case "family-mode":
         if (typeof action.enabled !== "boolean") return false;
@@ -399,10 +497,15 @@ export class GameRoom {
         if (count === null || count === this.state.teams.length) return false;
         while (this.state.teams.length < count) {
           const index = this.state.teams.length;
-          this.state.teams.push({ name: this.state.teamNames[index], score: 0, strikes: 0, color: TEAM_COLORS[index] });
+          this.state.teams.push({ name: this.state.teamNames[index], color: TEAM_COLORS[index] });
+        }
+        for (const savedRound of Object.values(this.state.rounds)) {
+          if (savedRound.activeTeam >= count) savedRound.activeTeam = 0;
+          const awardId = savedRound.lastAwardId;
+          const awardAllocation = this.state.allocations.find((allocation) => allocation.awardId === awardId);
+          if (awardAllocation?.owner.type === "team" && awardAllocation.owner.teamIndex >= count) savedRound.lastAwardId = null;
         }
         this.state.teams = this.state.teams.slice(0, count);
-        if (this.state.activeTeam >= count) this.state.activeTeam = 0;
         return true;
       }
       case "rename-team": {
@@ -414,8 +517,8 @@ export class GameRoom {
         return true;
       }
       case "reset":
-        this.state.teams.forEach((team) => { team.score = 0; team.strikes = 0; });
-        this.clearRound();
+        this.state.allocations = [];
+        Object.keys(this.state.rounds).forEach((roundId) => { this.state.rounds[roundId] = this.initialRoundState(); });
         this.recordEvent("reset");
         return true;
       case "end-room":
@@ -424,13 +527,6 @@ export class GameRoom {
       default:
         return false;
     }
-  }
-
-  clearRound() {
-    this.state.questionVisible = false;
-    this.state.revealed = [];
-    this.state.roundBank = 0;
-    this.state.teams.forEach((team) => { team.strikes = 0; });
   }
 
   async alarm() {
@@ -444,10 +540,16 @@ export class GameRoom {
 
   async replaceQuestionSet(familyFriendly) {
     const questionBank = await loadQuestionBank(this.env, "https://assets.local/");
+    this.state.archivedQuestionSets.push({ questions: this.state.questions, questionRoundIds: this.state.questionRoundIds });
     this.state.familyFriendly = familyFriendly;
     this.state.questions = pickQuestionSet(questionBank, familyFriendly);
+    this.state.questionRoundIds = this.state.questions.map(() => {
+      const roundId = this.state.nextRoundId;
+      this.state.nextRoundId += 1;
+      this.state.rounds[roundId] = this.initialRoundState();
+      return roundId;
+    });
     this.state.questionIndex = 0;
-    this.clearRound();
     this.recordEvent("question");
   }
 

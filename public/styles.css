@@ -405,18 +405,27 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .question-visibility-button { width: 100%; min-height: 3.5rem; margin-top: 1rem; border: 1px solid rgba(255, 194, 71, 0.55); border-radius: 0.75rem; background: rgba(255, 194, 71, 0.12); color: var(--gold); cursor: pointer; font-weight: 700; }
 .question-visibility-button.is-visible { border-color: var(--line); background: var(--panel-2); color: var(--ink); }
 .answer-controls { display: grid; gap: 0.55rem; }
-.answer-control { display: grid; grid-template-columns: 2.2rem 1fr auto; align-items: center; min-height: 3.6rem; padding: 0.55rem; border: 1px solid #2968ad; border-radius: 0.7rem; background: #0d3779; cursor: pointer; text-align: left; }
-.answer-control.revealed { opacity: 0.54; border-color: var(--line); background: #0b244f; }
+.answer-control-row { overflow: hidden; border: 1px solid #2968ad; border-radius: 0.7rem; background: #0d3779; }
+.answer-control-row.revealed { border-color: rgba(255, 194, 71, 0.72); box-shadow: inset 3px 0 var(--gold); }
+.answer-control { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; align-items: center; min-height: 3.6rem; padding: 0.55rem; }
+.answer-control-row.revealed .answer-control { background: #0b244f; }
 .answer-control .number { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--ink); color: #0c3979; font: 0.8rem/1 var(--display); }
-.answer-control .text { padding: 0 0.7rem; font-weight: 700; }
+.answer-control .text { min-width: 0; padding: 0 0.7rem; overflow-wrap: anywhere; font-weight: 700; }
 .answer-control .points { color: var(--gold); font: 0.9rem/1 var(--mono); }
+.answer-owner { display: flex; align-items: center; min-width: 0; overflow: hidden; padding: 0 0.65rem; color: var(--muted); font: 0.65rem/1 var(--mono); text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.answer-control-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.35rem; padding: 0.4rem; border-top: 1px solid rgba(41, 104, 173, 0.65); background: rgba(2, 10, 28, 0.2); }
+.answer-control-row.revealed .answer-control-actions { border-top-color: rgba(255, 194, 71, 0.3); }
+.answer-control-actions button { min-height: 2.15rem; padding: 0.4rem 0.5rem; border: 1px solid var(--line); border-radius: 0.5rem; background: rgba(2, 10, 28, 0.45); cursor: pointer; font-size: 0.72rem; font-weight: 700; line-height: 1.1; }
+.answer-control-actions .answer-score-button { border-color: rgba(255, 194, 71, 0.55); background: rgba(255, 194, 71, 0.12); color: var(--gold); }
+.answer-hide-button { color: var(--muted); }
 .team-picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.55rem; }
 .team-button { min-width: 0; padding: 0.8rem; border: 1px solid var(--line); border-radius: 0.7rem; background: rgba(2, 10, 28, 0.4); cursor: pointer; text-align: left; }
 .team-button.active { border-color: var(--team-color); box-shadow: inset 3px 0 var(--team-color); background: color-mix(in srgb, var(--team-color) 12%, transparent); }
 .team-button-name { display: block; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .team-button-meta { display: block; margin-top: 0.3rem; color: var(--muted); font: 0.67rem/1 var(--mono); }
-.bank-action { margin-top: 0.8rem; }
-.bank-action .award-button { width: 100%; }
+.bank-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-top: 0.8rem; }
+.bank-actions .award-button, .bank-actions .undo-award-button { width: 100%; }
+.undo-award-button strong { display: block; margin-top: 0.25rem; overflow: hidden; font: 0.72rem/1 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
 .strike-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 0.65rem; margin-top: 0.8rem; }
 .strike-actions .secondary-button { min-height: 5rem; }
 .strike-button { min-height: 5rem; border: 1px solid rgba(255, 73, 106, 0.45); border-radius: 0.8rem; background: rgba(255, 73, 106, 0.12); color: #ff7891; cursor: pointer; font: 1.5rem/1 var(--display); }

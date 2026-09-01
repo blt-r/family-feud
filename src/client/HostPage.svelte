@@ -24,6 +24,7 @@
     eventMessage: (reason) => reason === "inactive" ? "The room expired after 24 hours without host activity." : "The room has ended and its data was deleted.",
     onEvent: (event) => {
       if (event.type === "award") room.showToast(`Awarded ${event.points} points`);
+      if (event.type === "undo-award") room.showToast(`Returned ${event.points} points to the bank`);
     }
   });
 
@@ -79,12 +80,8 @@
     }
   }
 
-  function roundInProgress() {
-    return game && (game.roundBank > 0 || game.question.answers.some((answer) => answer.revealed) || game.teams.some((team) => team.strikes > 0));
-  }
-
-  function confirmRoundChange(action) {
-    return !roundInProgress() || confirm(`${action} will clear the current bank, revealed answers, and strikes. Continue?`);
+  function confirmQuestionReload() {
+    return confirm("Load a new question set? The current questions will leave the menu, but awarded scores will remain.");
   }
 
   async function copyText(text) {
@@ -130,15 +127,11 @@
 
   function changeQuestion(event) {
     const index = Number(event.currentTarget.value);
-    if (!confirmRoundChange("Changing questions")) {
-      event.currentTarget.value = String(game.questionIndex);
-      return;
-    }
     send("question", { index });
   }
 
   function changeFamilyMode(event) {
-    if (!confirmRoundChange("Changing the question filter")) {
+    if (!confirmQuestionReload()) {
       event.currentTarget.checked = game.familyFriendly;
       return;
     }
@@ -264,8 +257,9 @@
             </button>
           {/each}
         </div>
-        <div class="bank-action">
+        <div class="bank-actions">
           <button type="button" class="award-button" disabled={!online || game.roundBank === 0} onclick={() => send("award")}>Award bank<strong>{game.roundBank} pts</strong></button>
+          <button type="button" class="secondary-button undo-award-button" disabled={!online || !game.lastAward} onclick={() => send("undo-award")}>Undo award<strong>{game.lastAward ? `${game.teams[game.lastAward.team]?.name} · ${game.lastAward.points} pts` : "Nothing to undo"}</strong></button>
         </div>
         <div class="strike-actions">
           <button type="button" class="strike-button" disabled={!online} onclick={() => send("strike")}>Add X</button>
@@ -286,19 +280,31 @@
       </section>
 
       <section class="host-section answers">
-        <div class="section-heading"><h2>Answers</h2><span class="muted">Tap to reveal</span></div>
+        <div class="section-heading"><h2>Answers</h2></div>
         <div class="answer-controls">
           {#each game.question.answers as answer, index (`${game.questionIndex}-${answer.text}`)}
             {@const textParts = String(answer.text).split("/").map((text, position) => ({ text, position }))}
-            <button type="button" class={["answer-control", answer.revealed && "revealed"]} aria-label={`Reveal answer ${index + 1}: ${answer.text}, ${answer.points} points`} disabled={!online || answer.revealed} onclick={() => send("reveal", { index })}>
-              <span class="number">{index + 1}</span>
-              <span class="text">
-                {#each textParts as part (part.position)}
-                  {part.text}{#if part.position < textParts.length - 1}<span class="answer-separator">/</span>{/if}
-                {/each}
-              </span>
-              <span class="points">{answer.points}</span>
-            </button>
+            {@const ownerLabel = answer.owner?.type === "bank" ? "Bank" : answer.owner?.type === "unscored" ? "No points" : answer.owner?.type === "team" ? game.teams[answer.owner.teamIndex]?.name || `Team ${answer.owner.teamIndex + 1}` : ""}
+            <div class={["answer-control-row", answer.revealed && "revealed"]}>
+              <div class="answer-control">
+                <span class="number">{index + 1}</span>
+                <span class="text">
+                  {#each textParts as part (part.position)}
+                    {part.text}{#if part.position < textParts.length - 1}<span class="answer-separator">/</span>{/if}
+                  {/each}
+                </span>
+                <span class="points">{answer.points}</span>
+              </div>
+              <div class="answer-control-actions">
+                {#if answer.revealed}
+                  <span class="answer-owner">{ownerLabel}</span>
+                  <button type="button" class="answer-hide-button" aria-label={`Hide answer ${index + 1}: ${answer.text}`} disabled={!online} onclick={() => send("hide-answer", { index })}>Hide</button>
+                {:else}
+                  <button type="button" class="answer-score-button" aria-label={`Reveal answer ${index + 1} and add ${answer.points} points to the bank`} disabled={!online} onclick={() => send("reveal", { index })}>+ Bank</button>
+                  <button type="button" class="answer-only-button" aria-label={`Reveal answer ${index + 1} without points`} disabled={!online} onclick={() => send("reveal-only", { index })}>Reveal only</button>
+                {/if}
+              </div>
+            </div>
           {/each}
         </div>
       </section>
@@ -307,11 +313,11 @@
         <div class="section-heading"><h2>Question library</h2><span class="muted">{game.questionCount} loaded</span></div>
         <div class="settings-grid">
           <label class="toggle-row">
-            <span><strong>Family-friendly questions</strong><small>Changing this loads a new filtered set and clears the current round</small></span>
+            <span><strong>Family-friendly questions</strong><small>Changing this replaces the questions shown in this menu</small></span>
             <input type="checkbox" checked={game.familyFriendly} disabled={!online} onchange={changeFamilyMode} />
           </label>
-          <button type="button" class="secondary-button refresh-questions-button" disabled={!online} onclick={() => { if (confirm("Load 25 new questions and clear the current round?")) send("refresh-questions"); }}>Load 25 new questions</button>
-          <p class="host-note muted">Team names and total scores stay in place. Revealed answers, strikes, and the round bank are cleared.</p>
+          <button type="button" class="secondary-button refresh-questions-button" disabled={!online} onclick={() => { if (confirmQuestionReload()) send("refresh-questions"); }}>Load 25 new questions</button>
+          <p class="host-note muted">The current questions leave this menu. Their awarded points stay in the team totals, and the new questions start blank.</p>
         </div>
       </section>
 
@@ -329,7 +335,7 @@
       <section class="host-section">
         <div class="section-heading"><h2>Room controls</h2></div>
         <p class="host-note muted">Clear all scores, strikes, and revealed answers. Team names stay in place.</p>
-        <button type="button" class="danger-button room-control-button" disabled={!online} onclick={() => { if (confirm("Reset all scores and this round?")) send("reset"); }}>Reset entire game</button>
+        <button type="button" class="danger-button room-control-button" disabled={!online} onclick={() => { if (confirm("Reset all scores, strikes, and revealed answers across every question?")) send("reset"); }}>Reset entire game</button>
         <div class="end-room-control">
           <p class="host-note muted">Permanently close this room and disconnect the audience display. This cannot be undone.</p>
           <button type="button" class="danger-button room-control-button end-room-button" disabled={!online} onclick={() => { if (confirm("Permanently end this room and delete all of its data?")) send("end-room"); }}>End room permanently</button>
